@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Plataforma Inversiones</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: system-ui,sans-serif; background:#f5f5f5; margin:0; padding:0; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 24px; background:#2563eb; color:white; }
+  main { max-width:700px; margin:40px auto; background:white; padding:24px; border-radius:8px; }
+  input, select { width:100%; padding:8px; margin:6px 0; border-radius:4px; border:1px solid #ccc; }
+  button { background:#2563eb; color:white; padding:8px 14px; border:none; border-radius:4px; cursor:pointer; margin-top:6px; }
+  button.secondary { background:#888; margin-left:10px; }
+  .form-box { border:1px solid #ddd; padding:16px; border-radius:6px; margin-top:16px; background:#f9f9f9; }
+  .hidden { display:none; }
+  .row { margin-bottom:12px; justify-content:space-between; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Plataforma Inversiones</strong>
+  <button onclick="logout()">Salir</button>
+</header>
+
+<main>
+<!-- MENSAJE BIENVENIDA -->
+<p id="mensajeBienvenida" style="font-weight:bold; margin:16px;"></p>
+
+  <!-- LOGIN -->
+  <div id="loginBox">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Entrar</button>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hidden">
+
+    <!-- FORMULARIO DATOS USUARIO -->
+    <div id="formPerfil" class="form-box hidden">
+      <h4>Completa tus datos personales</h4>
+      <div class="row"><input id="nombre" placeholder="Nombre"></div>
+      <div class="row"><input id="apellidos" placeholder="Apellidos"></div>
+      <div class="row"><input id="dni" placeholder="DNI"></div>
+      <button onclick="guardarPerfil()">Guardar Datos</button>
+    </div>
+
+    <!-- PANEL ADMIN -->
+    <div id="adminPanel" class="form-box hidden">
+      <div style="margin-bottom:16px;">
+        <button onclick="mostrarFormOperacion()">Crear Inversión</button>
+        <button onclick="mostrarFormEmpresa()">Crear Empresa</button>
+      </div>
+
+      <!-- FORMULARIO CREAR EMPRESA -->
+      <div id="formEmpresa" class="form-box hidden">
+        <h4>Crear Empresa</h4>
+        <div class="row"><input id="empresaNombre" placeholder="Nombre empresa"></div>
+        <div class="row"><input id="empresaCif" placeholder="CIF"></div>
+        <div class="row"><input id="empresaCuenta" placeholder="Cuenta bancaria"></div>
+        <button onclick="crearEmpresa()">Guardar Empresa</button>
+        <button class="secondary" onclick="cancelar()">Cancelar</button>
+      </div>
+
+      <!-- FORMULARIO CREAR INVERSION -->
+      <div id="formOperacion" class="form-box hidden">
+        <h4>Crear Inversión</h4>
+        <div class="row"><select id="opEmpresa"></select></div>
+        <div class="row"><input id="opNombre" placeholder="Nombre inversión"></div>
+        <div class="row"><input id="opRentabilidad" type="number" step="0.01" placeholder="Rentabilidad (%)"></div>
+        <div class="row"><input id="opPlazo" type="number" placeholder="Plazo (meses)"></div>
+        <button onclick="crearOperacion()">Guardar Inversión</button>
+        <button class="secondary" onclick="cancelar()">Cancelar</button>
+      </div>
+
+      <!-- OPERACIONES ABIERTAS ADMIN -->
+      <div id="listaOperaciones" class="form-box">
+        <h4>Operaciones Abiertas</h4>
+        <div id="operacionesAdmin"></div>
+      </div>
+    </div>
+
+    <!-- PANEL USER -->
+    <div id="userPanel" class="hidden">
+
+      <!-- INVERSIONES ABIERTAS -->
+      <div id="inversionesAbiertas" class="form-box">
+        <h4>INVERSIONES ABIERTAS</h4>
+        <div id="operaciones"></div>
+      </div>
+
+      <!-- MIS INVERSIONES -->
+      <div id="misInversionesBox" class="form-box">
+        <h4>MIS INVERSIONES</h4>
+        <div id="misInversiones"></div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const supabaseCli = window.supabase.createClient(
+  'https://adentfqqughsqqpaswzu.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZW50ZnFxdWdoc3FxcGFzd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNDYxMDAsImV4cCI6MjA4NDcyMjEwMH0._jm4UsVu0DLPT9LYq--yynCbVCLEgDufTIglcTPm9_E'
+);
+
+/* LOGIN */
+async function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const { error } = await supabaseCli.auth.signInWithPassword({email,password});
+  if(error){ alert(error.message); return; }
+  cargarApp();
+}
+
+/* LOGOUT */
+async function logout(){
+  await supabaseCli.auth.signOut();
+  location.reload();
+}
+
+/* MOSTRAR FORMULARIOS */
+function mostrarFormEmpresa(){ document.getElementById('formEmpresa').classList.remove('hidden'); document.getElementById('formOperacion').classList.add('hidden'); }
+async function mostrarFormOperacion(){ document.getElementById('formOperacion').classList.remove('hidden'); document.getElementById('formEmpresa').classList.add('hidden'); await cargarEmpresas(); }
+function cancelar(){ document.getElementById('formEmpresa').classList.add('hidden'); document.getElementById('formOperacion').classList.add('hidden'); }
+
+/* CARGAR APP */
+async function cargarApp(){
+  const { data:{user} } = await supabaseCli.auth.getUser();
+  if(!user) return;
+
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  const { data: perfil } = await supabaseCli.from('profiles').select('nombre,apellidos,dni,role').eq('id',user.id).single();
+
+  // mensaje bienvenida
+  document.getElementById('mensajeBienvenida').innerText = perfil.role==='admin'?'Hola Administrador':`Hola ${perfil.nombre}`;
+
+  if(perfil.role==='admin'){
+    document.getElementById('adminPanel').classList.remove('hidden');
+    document.getElementById('userPanel').classList.add('hidden');
+    cargarOperacionesAdmin();
+  } else {
+    document.getElementById('userPanel').classList.remove('hidden');
+    document.getElementById('adminPanel').classList.add('hidden');
+    if(!perfil.nombre) document.getElementById('formPerfil').classList.remove('hidden');
+    else document.getElementById('formPerfil').classList.add('hidden');
+    cargarOperacionesUser();
+    cargarMisInversiones();
+  }
+}
+
+/* PERFIL USER */
+async function guardarPerfil(){
+  const nombre = document.getElementById('nombre').value;
+  const apellidos = document.getElementById('apellidos').value;
+  const dni = document.getElementById('dni').value;
+  const { data:{user} } = await supabaseCli.auth.getUser();
+  const { error } = await supabaseCli.from('profiles').upsert({id:user.id,nombre,apellidos,dni});
+  if(error){ alert(error.message); return; }
+  alert('Datos guardados');
+  document.getElementById('formPerfil').classList.add('hidden');
+}
+
+/* ADMIN: CREAR EMPRESA */
+async function crearEmpresa(){
+  const nombre = document.getElementById('empresaNombre').value;
+  const cif = document.getElementById('empresaCif').value;
+  const cuenta = document.getElementById('empresaCuenta').value;
+  const { error } = await supabaseCli.from('empresas').insert({nombre,cif,cuenta_bancaria:cuenta});
+  if(error){ alert(error.message); return; }
+  alert('Empresa creada');
+  document.getElementById('formEmpresa').classList.add('hidden');
+  document.getElementById('empresaNombre').value='';
+  document.getElementById('empresaCif').value='';
+  document.getElementById('empresaCuenta').value='';
+  cargarEmpresas();
+}
+
+/* CARGAR EMPRESAS SELECT */
+async function cargarEmpresas(){
+  const { data,error } = await supabaseCli.from('empresas').select('id,nombre');
+  if(error){ console.error(error.message); return; }
+  const sel = document.getElementById('opEmpresa');
+  sel.innerHTML='';
+  data.forEach(e=>{ sel.innerHTML+=`<option value="${e.id}">${e.nombre}</option>`; });
+}
+
+/* CREAR OPERACION */
+async function crearOperacion(){
+  const empresa_id = document.getElementById('opEmpresa').value;
+  const nombre = document.getElementById('opNombre').value;
+  const rentabilidad = parseFloat(document.getElementById('opRentabilidad').value);
+  const plazo = parseInt(document.getElementById('opPlazo').value);
+  const { error } = await supabaseCli.from('operaciones').insert({empresa_id,nombre,rentabilidad_inicial:rentabilidad,plazo_previsto_meses:plazo,estado:'abierta'});
+  if(error){ alert(error.message); return; }
+  alert('Inversión creada');
+  document.getElementById('formOperacion').classList.add('hidden');
+  document.getElementById('opNombre').value='';
+  document.getElementById('opRentabilidad').value='';
+  document.getElementById('opPlazo').value='';
+  cargarOperacionesAdmin();
+}
+
+/* CARGAR OPERACIONES ADMIN */
+async function cargarOperacionesAdmin(){
+  const { data,error } = await supabaseCli.from('operaciones')
+    .select('id,nombre,rentabilidad_inicial,plazo_previsto_meses,empresas(nombre)')
+    .eq('estado','abierta');
+  if(error){ console.error(error.message); return; }
+  const cont = document.getElementById('operacionesAdmin');
+  cont.innerHTML='';
+  data.forEach(op=>{
+    cont.innerHTML+=`<div class="row"><strong>${op.nombre}</strong> — ${op.empresas.nombre} — ${op.rentabilidad_inicial}% — ${op.plazo_previsto_meses} meses</div>`;
+  });
+}
+
+/* USER: OPERACIONES ABIERTAS */
+async function cargarOperacionesUser(){
+  const { data:{user} } = await supabaseCli.auth.getUser();
+  const { data,error } = await supabaseCli.from('operaciones')
+    .select('id,nombre,rentabilidad_inicial,plazo_previsto_meses,empresas(nombre,cuenta_bancaria),inscripciones(user_id)')
+    .eq('estado','abierta');
+  if(error){ console.error(error.message); return; }
+  const cont = document.getElementById('operaciones');
+  cont.innerHTML='';
+
+  const abiertas = data.filter(op=>{
+    if(!op.inscripciones || op.inscripciones.length===0) return true;
+    return !op.inscripciones.some(i=>i.user_id===user.id);
+  });
+
+  if(abiertas.length===0){ cont.innerHTML='<p>Actualmente no hay inversiones abiertas</p>'; return; }
+
+  abiertas.forEach(op=>{
+    cont.innerHTML+=`<div class="row">
+      <strong>${op.nombre}</strong> — ${op.rentabilidad_inicial}% — ${op.plazo_previsto_meses} meses
+      <button onclick="mostrarInvertir('${op.id}','${op.empresas.nombre}','${op.empresas.cuenta_bancaria}','${op.nombre}')">Invertir</button>
+    </div>`;
+  });
+}
+
+/* MOSTRAR FORM INVERTIR */
+function mostrarInvertir(opId, empresa, cuenta, nombreInversion){
+  const row = document.getElementById(`invertir_${opId}`);
+  if(row) row.remove();
+  const cont = document.getElementById('operaciones');
+  const div = document.createElement('div');
+  div.id = `invertir_${opId}`;
+  div.className = 'form-box';
+  div.innerHTML = `
+    <h4>DATOS PARA HACER LA TRANSFERENCIA</h4>
+    <p>Beneficiario: ${empresa}</p>
+    <p>Cuenta bancaria: ${cuenta}</p>
+    <p>Concepto: ${nombreInversion}</p>
+    <input type="number" id="importe_${opId}" placeholder="Cantidad a invertir">
+    <button onclick="apuntarse('${opId}')">Confirmar Inversión</button>
+    <button class="secondary" onclick="this.parentElement.remove()">Cancelar</button>
+  `;
+  cont.appendChild(div);
+}
+
+/* APUNTARSE */
+async function apuntarse(operacionId){
+  const { data:{user} } = await supabaseCli.auth.getUser();
+  const importeInput = document.getElementById(`importe_${operacionId}`);
+  const importe = parseFloat(importeInput.value);
+  if(isNaN(importe) || importe<=0){ alert('Introduce un importe válido'); return; }
+  const { error } = await supabaseCli.from('inscripciones').insert({operacion_id:operacionId,user_id:user.id,importe});
+  if(error){ alert(error.message); return; }
+  alert('Inversión registrada correctamente');
+  cargarOperacionesUser();
+  cargarMisInversiones();
+}
+
+/* CARGAR MIS INVERSIONES */
+async function cargarMisInversiones(){
+  const { data:{user} } = await supabaseCli.auth.getUser();
+  const { data,error } = await supabaseCli.from('inscripciones')
+    .select('operacion_id,importe,operaciones(nombre,rentabilidad_inicial,plazo_previsto_meses,empresas(nombre))')
+    .eq('user_id',user.id);
+  const cont = document.getElementById('misInversiones');
+  cont.innerHTML='';
+  if(error){ console.error(error.message); return; }
+  if(!data || data.length===0){ cont.innerHTML='<p>No te has apuntado a ninguna inversión aún.</p>'; return; }
+  data.forEach(ins=>{
+    const op = ins.operaciones;
+    cont.innerHTML+=`<div class="row"><strong>${op.nombre}</strong> — ${op.empresas.nombre} — ${op.rentabilidad_inicial}% — ${op.plazo_previsto_meses} meses</div>`;
+  });
+}
+</script>
+</body>
+</html>
