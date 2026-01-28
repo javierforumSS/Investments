@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Stella Investments User</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="cssUsuario.css">
+</head>
+<body>
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><i data-lucide="trending-up"></i></div>
+    <span class="logo-text">StellaMaris</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div>Hola <strong><span id="welcomeUser"></span></strong></div><br>
+    <div class="nav-item active" id="nav-opportunities">
+      <i data-lucide="bar-chart-3"></i><span>Oportunidades</span>
+    </div>
+    <div class="nav-item" id="nav-my">
+      <i data-lucide="layers"></i><span>Mis Inversiones</span>
+    </div>
+    <div class="nav-item" id="nav-profile">
+      <i data-lucide="user"></i><span>Tu Perfil</span>
+    </div>
+  </nav>
+  <button class="toggle-btn" onclick="toggleSidebar()">
+    <i data-lucide="chevron-left"></i>
+  </button>
+
+  <button onclick="logout()">Salir</button>
+
+</aside>
+<!-- ================= CONTENIDO ================= -->
+<div id="message-container" class="message-container"></div>
+<main class="main-content">
+  <!-- ===== OPORTUNIDADES ===== -->
+  <div class="page-section" id="section-opportunities">
+    <header class="page-header">
+      <h1>💼 Tus Oportunidades de Inversión</h1>
+      <p id="msg-opportunities">Inversiones disponibles para ti</p>
+    </header>
+    <div class="investments-grid" id="grid-opportunities"></div>
+  </div>
+  <!-- ===== MIS INVERSIONES ===== -->
+  <div class="page-section" id="section-my" style="display:none;">
+    <header class="page-header">
+      <h1>📊 Tus Inversiones</h1>
+      <p id="msg-my">Inversiones en las que ya participas</p>
+    </header>
+    <div class="investments-grid" id="grid-my"></div>
+  </div>
+  <!-- ===== MI PERFIL ===== -->
+  <div class="page-section" id="section-profile" style="display:none;">
+    <header class="page-header">
+      <h1>👤 Mi Perfil</h1>
+      <p>Modifica tus datos personales.</p>
+    </header>
+    <div class="profile-form">
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" id="profile-nombre" placeholder="Nombre">
+      </div>
+      <div class="form-group">
+        <label>Apellidos</label>
+        <input type="text" id="profile-apellidos" placeholder="Apellidos">
+      </div>
+      <div class="form-group">
+        <label>DNI</label>
+        <input type="text" id="profile-dni" placeholder="DNI">
+      </div>
+      <button class="btn-invest" onclick="saveProfile()">
+        Guardar <i data-lucide="check"></i>
+      </button>
+    </div>
+  </div>
+</main>
+<!-- ================= MODAL ================= -->
+<div class="modal-overlay" id="investModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nueva Inversión</h2>
+      <button class="modal-close" onclick="closeModal()">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Inversión</label>
+        <input id="modalCompany" readonly>
+      </div>
+      <div class="form-group">
+        <label>Monto (€)</label>
+        <input type="number" id="investAmount" min="100" step="100" oninput="updateSummary()">
+      </div>
+      <div class="investment-summary">
+        <div class="summary-row">
+          <span>Rentabilidad</span>
+          <span id="modalRent">0%</span>
+        </div>
+        <div class="summary-row">
+          <span>Plazo</span>
+          <span id="modalPlazo">0 meses</span>
+        </div>
+        <div class="summary-row total">
+          <span>Retorno estimado</span>
+          <span id="modalReturn">€0</span>
+        </div>
+      </div>
+    </div>
+    <button class="btn-invest" onclick="confirmInvestment()">
+      Confirmar
+      <i data-lucide="check"></i>
+    </button>
+  </div>
+</div>
+
+<script>
+/* ================= SUPABASE ================= */
+const supabaseCli = window.supabase.createClient(
+  'https://adentfqqughsqqpaswzu.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZW50ZnFxdWdoc3FxcGFzd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNDYxMDAsImV4cCI6MjA4NDcyMjEwMH0._jm4UsVu0DLPT9LYq--yynCbVCLEgDufTIglcTPm9_E'
+);
+
+/* ================= STATE ================= */
+let allInvestments = [];
+let myInvestments = [];
+let selectedInvestmentId = null;
+
+/* ================= ELEMENTOS ================= */
+let navOpportunities, navMy, navProfile;
+let sectionOpportunities, sectionMy, sectionProfile;
+
+let investModal, modalCompany, modalRent, modalPlazo, modalReturn, investAmount;
+
+/* ================= INIT ================= */
+document.addEventListener('DOMContentLoaded', async () => {
+  lucide.createIcons();
+
+  navOpportunities = document.getElementById('nav-opportunities');
+  navMy = document.getElementById('nav-my');
+  navProfile = document.getElementById('nav-profile');
+
+  sectionOpportunities = document.getElementById('section-opportunities');
+  sectionMy = document.getElementById('section-my');
+  sectionProfile = document.getElementById('section-profile');
+
+  investModal = document.getElementById('investModal');
+  modalCompany = document.getElementById('modalCompany');
+  modalRent = document.getElementById('modalRent');
+  modalPlazo = document.getElementById('modalPlazo');
+  modalReturn = document.getElementById('modalReturn');
+  investAmount = document.getElementById('investAmount');
+
+  await autoLogin();
+  await loadAll();
+  await loadProfile();
+
+  navOpportunities.onclick = () => switchSection('opportunities');
+  navMy.onclick = () => switchSection('my');
+  navProfile.onclick = () => switchSection('profile');
+});
+
+/* ================= LOGIN ================= */
+async function autoLogin(){
+      const { data: { user } } = await supabaseCli.auth.getUser();
+
+      if (!user) {
+        window.location.href = './';
+        return;
+      }
+
+      const { data: profile, error } = await supabaseCli
+        .from('profiles')
+        .select('nombre, role')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile) {
+        window.location.href = './';
+        return;
+      }
+
+      if (profile.role !== 'user') {
+        window.location.href = './';
+        return;
+      }
+
+      document.getElementById('welcomeUser').textContent =
+        profile.nombre || user.email;
+    }
+
+/* ================= LOGOUT ================= */
+async function logout(){
+  await supabaseCli.auth.signOut();
+  window.location.href = './';
+}
+
+/* ================= LOAD DATA ================= */
+async function loadAll(){
+  await loadOpportunities();
+  await loadMyInvestments();
+  renderSections();
+}
+
+async function loadOpportunities(){
+  const { data } = await supabaseCli
+    .from('operaciones')
+    .select(`id, nombre, rentabilidad_inicial, plazo_previsto_meses, estado, empresas(nombre)`)
+    .eq('estado','Abierta');
+
+  allInvestments = data || [];
+}
+
+async function loadMyInvestments(){
+  const { data: { user } } = await supabaseCli.auth.getUser();
+
+  const { data } = await supabaseCli
+    .from('inscripciones')
+    .select(`
+      importe,
+      created_at,
+      operaciones (
+        id, nombre, rentabilidad_inicial, plazo_previsto_meses, estado,
+        empresas(nombre)
+      )
+    `)
+    .eq('user_id', user.id);
+
+  myInvestments = (data || []).map(i => ({
+    ...i.operaciones,
+    importe: i.importe,
+    created_at: i.created_at
+  }));
+}
+
+/* ================= PROGRESO ================= */
+function calculateProgress(createdAt, plazoMeses){
+  if(!createdAt || !plazoMeses) return { meses: 0, porcentaje: 0 };
+
+  const start = new Date(createdAt);
+  const now = new Date();
+
+  let meses = (now.getFullYear() - start.getFullYear()) * 12 +
+              (now.getMonth() - start.getMonth());
+
+  if (now.getDate() < start.getDate()) meses--;
+  meses = Math.max(0, meses);
+
+  return {
+    meses,
+    porcentaje: Math.min(100, (meses / plazoMeses) * 100)
+  };
+}
+
+/* ================= RENDER ================= */
+function renderSections(){
+  const opportunities = allInvestments.filter(
+    i => !myInvestments.find(m => m.id === i.id)
+  );
+
+  const gridOp = document.getElementById('grid-opportunities');
+  const gridMy = document.getElementById('grid-my');
+
+  gridOp.innerHTML = opportunities.map(renderCard).join('');
+  gridMy.innerHTML = myInvestments.map(renderCard).join('');
+
+  document.getElementById('msg-opportunities').textContent =
+    opportunities.length ? 'Inversiones disponibles para ti' : 'No hay inversiones disponibles';
+
+  document.getElementById('msg-my').textContent =
+    myInvestments.length ? 'Tus inversiones activas' : 'No participas en ninguna inversión';
+
+  lucide.createIcons();
+}
+
+function renderCard(inv){
+  const empresa = inv.empresas?.nombre || '—';
+
+  let footer = '';
+  if (inv.importe){
+    const p = calculateProgress(inv.created_at, inv.plazo_previsto_meses);
+    footer = `
+      <div class="progress-section">
+        <div class="progress-header">
+          <span>Progreso</span>
+          <span>${p.meses}/${inv.plazo_previsto_meses} meses</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${p.porcentaje}%"></div>
+        </div>
+      </div>
+      <div class="invested-amount">
+        <span>Invertido</span>
+        <span>€${inv.importe.toLocaleString()}</span>
+      </div>`;
+  } else {
+    footer = `
+      <button class="btn-invest" onclick="openModal('${inv.id}')">
+        Invertir <i data-lucide="arrow-right"></i>
+      </button>`;
+  }
+
+  return `
+  <div class="investment-card">
+    <div class="card-header">
+      <div class="card-company">
+        <div class="company-icon"><i data-lucide="building-2"></i></div>
+        <div>
+          <h3>${inv.nombre}</h3>
+          <p>${empresa}</p>
+        </div>
+      </div>
+      <span class="badge badge-active">${inv.estado}</span>
+    </div>
+
+    <div class="card-stats">
+      <div>
+        <div>Rentabilidad</div>
+        <strong>${inv.rentabilidad_inicial}%</strong>
+      </div>
+      <div>
+        <div>Plazo</div>
+        <strong>${inv.plazo_previsto_meses} meses</strong>
+      </div>
+    </div>
+
+    ${footer}
+  </div>`;
+}
+
+/* ================= MODAL ================= */
+function openModal(id){
+  const inv = allInvestments.find(i => i.id === id);
+  if(!inv) return;
+
+  selectedInvestmentId = id;
+  modalCompany.value = inv.nombre;
+  modalRent.textContent = inv.rentabilidad_inicial + '%';
+  modalPlazo.textContent = inv.plazo_previsto_meses + ' meses';
+  investModal.classList.add('active');
+}
+
+function closeModal(){
+  investModal.classList.remove('active');
+  selectedInvestmentId = null;
+}
+
+function updateSummary(){
+  const amount = +investAmount.value || 0;
+  const rent = +modalRent.textContent.replace('%','');
+  modalReturn.textContent = '€' + (amount * (1 + rent / 100)).toFixed(2);
+}
+
+async function confirmInvestment(){
+  const { data: { user } } = await supabaseCli.auth.getUser();
+  const amount = +investAmount.value;
+
+  if(amount < 100){
+    showMessage('El mínimo de inversión es €100','error');
+    return;
+  }
+
+  await supabaseCli.from('inscripciones').insert({
+    user_id: user.id,
+    operacion_id: selectedInvestmentId,
+    importe: amount
+  });
+
+  closeModal();
+  await loadAll();
+  showMessage('Te has inscrito en la inversión');
+}
+
+/* ================= SECCIONES ================= */
+function switchSection(section){
+  // Ocultar todas las secciones
+  sectionOpportunities.style.display = 'none';
+  sectionMy.style.display = 'none';
+  sectionProfile.style.display = 'none';
+
+  // Quitar active de todos los nav-items
+  [navOpportunities, navMy, navProfile].forEach(nav => nav.classList.remove('active'));
+
+  // Mostrar la sección correspondiente y marcar nav activo
+  if(section === 'opportunities') {
+    sectionOpportunities.style.display = 'block';
+    navOpportunities.classList.add('active');
+  }
+  if(section === 'my') {
+    sectionMy.style.display = 'block';
+    navMy.classList.add('active');
+  }
+  if(section === 'profile') {
+    sectionProfile.style.display = 'block';
+    navProfile.classList.add('active');
+  }
+}
+
+
+/* ================= PERFIL ================= */
+async function loadProfile(){
+  try {
+    const { data: userData } = await supabaseCli.auth.getUser();
+    const user = userData.user;
+    if(!user) return;
+
+    const { data: profile, error } = await supabaseCli
+      .from('profiles')
+      .select('nombre, apellidos, dni')
+      .eq('user_id', user.id)
+      .single();
+
+    if(error) return showMessage('Error cargando perfil','error');
+
+    document.getElementById('welcomeUser').textContent = profile.nombre;
+    document.getElementById('profile-nombre').value = profile.nombre;
+    document.getElementById('profile-apellidos').value = profile.apellidos;
+    document.getElementById('profile-dni').value = profile.dni;
+
+  } catch(e){
+    console.error(e);
+    showMessage('Error cargando perfil','error');
+  }
+}
+
+
+
+async function saveProfile() {
+  const { data: { user } } = await supabaseCli.auth.getUser();
+
+  const { error } = await supabaseCli
+    .from('profiles')
+    .update({
+      nombre: document.getElementById('profile-nombre').value,
+      apellidos: document.getElementById('profile-apellidos').value,
+      dni: document.getElementById('profile-dni').value
+    })
+    .eq('id', user.id);
+
+  if (error) {
+    return showMessage('Error al actualizar profile: ' + error.message, 'error');
+  }
+
+  showMessage('Datos modificados correctamenteee');
+
+  loadProfile();
+  loadAll();
+  setTimeout(switchSection,1000,'opportunities');
+}
+
+
+
+/* ================= MENSAJES ================= */
+function showMessage(text, type='success'){
+  const c = document.getElementById('message-container');
+  const m = document.createElement('div');
+  m.className = 'message' + (type === 'error' ? ' error' : '');
+  m.textContent = text;
+  c.appendChild(m);
+  setTimeout(() => m.remove(), 3000);
+}
+</script>
+
+
+</body>
+</html>
