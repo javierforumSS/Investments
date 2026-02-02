@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Stella Maris Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+  /* ==================== VARIABLES ORIGINALES ==================== */
+:root {
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --primary-dark: #1e40af;
+  --secondary: #60a5fa;
+  --bg-light: #f0f4f8;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --text-dark: #1e293b;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --success: #10b981;
+  --success-bg: #d1fae5;
+  --warning: #f59e0b;
+  --warning-bg: #fef3c7;
+  --error: #ef4444;
+  --error-bg: #fee2e2;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --sidebar-width: 280px;
+  --sidebar-collapsed: 80px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #e0e7ff 100%);
+  color: var(--text-dark);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Fondo animado */
+.background-blobs { position:fixed; inset:0; z-index:-1; overflow:hidden; }
+.blob {
+  position:absolute; border-radius:50%; filter:blur(80px); opacity:0.3;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-1 { width:400px; height:400px; background:var(--primary); top:-100px; right:-100px; }
+.blob-2 { width:350px; height:350px; background:var(--secondary); bottom:-100px; left:-100px; animation-delay:-4s; }
+@keyframes float { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(-20px) scale(1.05);} }
+
+/* Sidebar */
+.sidebar {
+  position:fixed; left:0; top:0; height:100vh; width:var(--sidebar-width);
+  background:var(--glass-bg); backdrop-filter:blur(20px);
+  border-right:1px solid var(--glass-border); padding:24px 16px;
+  display:flex; flex-direction:column; transition:width .3s; z-index:100;
+}
+.sidebar.collapsed { width:var(--sidebar-collapsed); }
+.sidebar-logo { display:flex; align-items:center; gap:12px; margin-bottom:32px; }
+.logo-icon { width:48px; height:48px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:12px; display:flex; align-items:center; justify-content:center; }
+.logo-icon svg { color:white; width:24px; height:24px; }
+.logo-text { font-weight:700; font-size:20px; white-space:nowrap; overflow:hidden; transition:opacity .3s; }
+.sidebar.collapsed .logo-text { opacity:0; }
+.sidebar-nav { flex:1; display:flex; flex-direction:column; gap:8px; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; color:var(--text-muted); cursor:pointer; transition:all .2s; }
+.nav-item:hover { background:rgba(37,99,235,0.1); color:var(--primary); }
+.nav-item.active { background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; box-shadow:0 4px 16px rgba(37,99,235,0.3); }
+.nav-item svg { width:22px; height:22px; flex-shrink:0; }
+.nav-item span { white-space:nowrap; overflow:hidden; transition:opacity .3s; }
+.nav-item.close {background: red; color: white;box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);}
+.sidebar.collapsed .nav-item span { opacity:0; }
+.sidebar-footer { padding-top:16px; border-top:1px solid var(--glass-border); }
+.user-info { display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:rgba(37,99,235,0.05); }
+.user-avatar { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,var(--primary),var(--secondary)); display:flex; align-items:center; justify-content:center; color:white; font-weight:600; }
+.user-details { overflow:hidden; transition:opacity .3s; }
+.sidebar.collapsed .user-details { opacity:0; }
+.user-name { font-weight:600; font-size:14px; white-space:nowrap; }
+.user-role { font-size:12px; color:var(--text-muted); }
+.toggle-btn { position:absolute; right:-14px; top:32px; width:28px; height:28px; background:white; border:1px solid var(--glass-border); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:all .2s; }
+.toggle-btn:hover { background:var(--primary); color:white; }
+.sidebar.collapsed .toggle-btn svg { transform:rotate(180deg); }
+
+/* Main content */
+.main-content { margin-left:var(--sidebar-width); padding:32px; transition:margin-left .3s; min-height:100vh; }
+.sidebar.collapsed ~ .main-content { margin-left:var(--sidebar-collapsed); }
+.page-header { margin-bottom:32px; }
+.page-header h1 { font-size:28px; font-weight:700; margin-bottom:8px; }
+.page-header p { color:var(--text-muted); }
+
+/* Filtros */
+.filters-bar { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+.filter-btn { padding:10px 20px; border-radius:24px; border:1px solid var(--glass-border); background:var(--glass-bg); backdrop-filter:blur(10px); color:var(--text-muted); font-size:14px; font-weight:500; cursor:pointer; transition:all .2s; }
+.filter-btn:hover { border-color:var(--primary); color:var(--primary); }
+.filter-btn.active { background:var(--primary); color:white; border-color:var(--primary); }
+.search-box { flex:1; min-width:200px; position:relative; }
+.search-box input { width:100%; padding:10px 16px 10px 44px; border-radius:24px; border:1px solid var(--glass-border); background:var(--glass-bg); backdrop-filter:blur(10px); font-size:14px; color:var(--text-dark); transition:all .2s; }
+.search-box input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 20px rgba(37,99,235,0.15); }
+.search-box svg { position:absolute; left:16px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--text-muted); }
+
+/* Grid y tarjetas */
+    /* Barra de progreso */
+    .progress-section {
+      margin-bottom: 20px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .progress-header span:first-child {
+      color: var(--text-muted);
+    }
+
+    .progress-header span:last-child {
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: rgba(37, 99, 235, 0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      border-radius: 10px;
+      transition: width 0.8s ease;
+    }
+
+ .invested-amount {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      background: rgba(37, 99, 235, 0.08);
+      border: 1px solid rgba(37, 99, 235, 0.15);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    .invested-amount span:first-child {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .invested-amount span:last-child {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+.investments-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:24px; }
+.investment-card { background:var(--bg-card); backdrop-filter:blur(20px); border:1px solid var(--glass-border); border-radius:20px; padding:24px; transition:all .3s; }
+.investment-card:hover { transform:translateY(-6px); box-shadow:0 20px 60px rgba(37,99,235,0.15); }
+.card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+.card-company { display:flex; align-items:center; gap:14px; }
+.company-icon { width:52px; height:52px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:14px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(37,99,235,0.25); }
+.company-icon svg { width:26px; height:26px; color:white; }
+.company-info h3 { font-size:16px; font-weight:600; margin-bottom:4px; }
+.company-info p { font-size:14px; color:var(--text-muted); }
+.badge { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-active { background:var(--success-bg); color:var(--success); }
+.badge-cancelled { background:var(--error-bg); color:var(--error); }
+.card-stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+.stat-box { padding:14px; border-radius:12px; background:rgba(37,99,235,0.05); }
+.stat-label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+.stat-label svg { width:14px; height:14px; }
+.stat-value { font-size:20px; font-weight:700; }
+.stat-value.success { color:var(--success); }
+
+/* Botones */
+.btn-invest { width:100%; padding:14px 24px; background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:all .3s; }
+.btn-invest:hover { transform:scale(1.02); box-shadow:0 8px 24px rgba(37,99,235,0.35); }
+.btn-invest svg { width:18px; height:18px; transition:transform .2s; }
+.btn-invest:hover svg { transform:translateX(4px); }
+
+
+#edit-company, #new-company, #edit-estado {
+  appearance: base-select; /* Estilo moderno */
+  background-color: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-family: sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%; /* Ajuste moderno */
+  height: 45px;
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+
+/* Modal */
+..modal { /*background:white;*/ position:fixed;border-radius:24px; padding:32px; width:100%; max-width:440px; margin:16px; transform:scale(0.9); transition:transform .3s; /*box-shadow:0 24px 80px rgba(0,0,0,0.2);*/ }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+.modal-header h2 { font-size:20px; font-weight:700; }
+.modal-close { width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.05); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.modal-close:hover { background:var(--error-bg); color:var(--error); }
+.form-group { margin-bottom:20px; }
+.form-group label { display:block; font-size:14px; font-weight:500; color:var(--text-muted); margin-bottom:8px; }
+.form-group input { width:100%; padding:14px 16px; border:1px solid #e2e8f0; border-radius:12px; font-size:16px; transition:all .2s; }
+.form-group input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+.investment-summary { background:rgba(37,99,235,0.05); border-radius:12px; padding:16px; }
+.summary-row { display:flex; justify-content:space-between; padding:8px 0; }
+.summary-row:not(:last-child) { border-bottom:1px solid rgba(0,0,0,0.05); }
+.summary-row span:first-child { color:var(--text-muted); }
+.summary-row span:last-child { font-weight:600; }
+.summary-row.total span:last-child { color:var(--success); font-size:18px; }
+
+/* MENSAJES*/
+.message-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+}
+
+.message {
+  background-color: #38a169; /* verde para éxito */
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  opacity: 0.95;
+  transition: opacity 0.5s ease;
+}
+.message.error {
+  background-color: #e53e3e; /* rojo para error */
+}
+
+/* ====================================================
+======================================================= */
+
+
+
+.message-container{
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+}
+
+.message{
+  background:#16a34a;
+  color:#fff;
+  padding:12px 16px;
+  border-radius:8px;
+  margin-bottom:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.15);
+}
+.message.error{
+  background:#dc2626;
+}
+
+
+
+#investmentModal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* centra exactamente */
+  z-index: 10000;
+  /*background: #fff;*/
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 500px;
+  width: 90%;
+  /*box-shadow: 0 10px 25px rgba(0,0,0,0.3);*/
+  display: none; /* oculto por defecto */
+}
+#investmentModal.active {
+  display: block; /* se activa con JS */
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;               /* 🔴 oculto por defecto */
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* ===== MODAL VISIBLE ===== */
+.modal-overlay.active {
+  display: flex;               /* 🟢 visible cuando JS añade .active */
+}
+
+/* ===== MODAL VISIBLE ===== */
+.modal-overlay.active {
+  display: flex;               /* 🟢 visible cuando JS añade .active */
+}
+
+  .message-container{
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+  }
+  .message{
+    background: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .message.error{
+    background: #f44336;
+  }
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar { width:var(--sidebar-collapsed); }
+  .sidebar .logo-text, .sidebar .nav-item span, .sidebar .user-details { opacity:1; }
+  .main-content { margin-left:var(--sidebar-collapsed); padding:20px; }
+  .investments-grid { grid-template-columns:1fr; }
+  .toggle-btn { display:none; }
+}
+  /* Override para mobile - transición del sidebar */
+  .sidebar {
+    transition: transform 0.3s ease;
+  }
+  
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* centra exactamente */
+    width: 100%;
+    height: 100%;
+    /*background: rgb(238 238 235 / 10%);*/
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  .modal-content {
+    background: linear-gradient(135deg, #eef4ed, #e8e5dd);
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    /*box-shadow: 0 4px 20px rgba(0,0,0,0.2);*/
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  .modal-header h2 {
+    margin: 0;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+  }
+  .company-card {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+  }
+  .company-card p {
+    margin: 5px 0;
+  }
+  .btn-edit {
+    margin-left: 50%;
+    transform: translateX(-50%);
+    background:linear-gradient(135deg, #f6e3b0, #f6c249);
+    width: 40%;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .btn-create {
+    background: #4CAF50;
+    display: inline-flex;
+    align-items: center;   /* 👈 CLAVE */
+    gap: 8px;              /* separación texto / icono */
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 20px;
+    font-size: 16px;
+  }
+  .investment-card {
+    position: relative;
+  }
+  .investment-card .btn-edit {
+    width: 100%;
+  /*  bottom: 50px;*/
+  /*  right: 10px;*/
+  }
+  
+  /* ========================================
+     MOBILE HEADER
+  ======================================== */
+  .mobile-header {
+    display: none;
+    position: relative;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    z-index: 999;
+    padding: 0 16px;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform 0.3s ease;
+  }
+  
+  /* Ocultar header cuando sidebar está abierto */
+  .mobile-header.hidden {
+    transform: translateY(-100%);
+  }
+  
+  .hamburger-btn {
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  
+  .hamburger-btn:hover {
+    background: rgba(37, 99, 235, 0.1);
+  }
+  
+  .hamburger-btn svg {
+    width: 24px;
+    height: 24px;
+    color: var(--text-dark);
+  }
+  
+  .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .mobile-logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .mobile-logo-icon svg {
+    color: white;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .mobile-logo-text {
+    width: 100%;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text-dark);
+  }
+  
+  /* ========================================
+     SIDEBAR OVERLAY (para cerrar en móvil)
+  ======================================== */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 98;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .sidebar-overlay.active {
+    opacity: 1;
+  }
+  
+  /* ========================================
+     RESPONSIVE - MOBILE
+  ======================================== */
+  @media (max-width: 768px) {
+    /* Mostrar header móvil */
+    .mobile-header {
+      display: flex;
+    }
+    
+    /* Sidebar fuera de pantalla por defecto */
+    .sidebar {
+      transform: translateX(-100%);
+      width: 340px; /* Ancho completo en móvil */
+    }
+    
+    /* Sidebar abierto */
+    .sidebar.open {
+      transform: translateX(0);
+      background: white;
+    }
+    
+    /* Mostrar overlay cuando sidebar está abierto */
+    .sidebar.open ~ .sidebar-overlay {
+      display: block;
+    }
+    
+    /* Contenido principal sin margen */
+    .main-content {
+      margin-left: 0;
+      padding: 30px 16px 24px;
+    }
+    
+    /* Grid de inversiones en una columna */
+    .investments-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    /* Ocultar toggle-btn en móvil */
+    .toggle-btn {
+      display: none;
+    }
+  }
+  
+.logout-btn {
+    width: 100%;
+    padding: 14px;
+    background: red;
+    color: white;
+    border: 2px solid var(--error);
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 16px;
+}
+
+.modal-content.inversiones{
+  margin-left:-9rem;
+  }
+}
+</style>
+</head>
+<body>
+<!-- MOBILE HEADER -->
+<div class="mobile-header">
+  <button class="hamburger-btn" id="mobile-toggle">
+    <i data-lucide="menu"></i>
+  </button>
+  <div class="mobile-logo">
+    <div class="mobile-logo-icon">
+      <i data-lucide="trending-up"></i>
+    </div>
+    <span class="mobile-logo-text">Stella Maris Investments</span>
+  </div>
+  <div style="width:44px"></div> <!-- opcional para balancear si quieres -->
+</div>
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><i data-lucide="trending-up"></i></div>
+    <span class="logo-text">Stella Maris Investments</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div style="width: 100%;">Hola <strong><span id="welcomeUser" style="width: 100%;"></span></strong></div><br>
+    <div class="nav-item active" id="nav-actives">
+      <i data-lucide="bar-chart-3"></i><span>Activas</span>
+    </div>
+    <div class="nav-item" id="nav-new">
+      <i data-lucide="plus-circle"></i><span>Nueva Inversión</span>
+    </div>
+    <div class="nav-item" id="nav-companies">
+      <i data-lucide="building-2"></i><span>Empresas</span>
+    </div>
+  </nav>
+
+    <button class="logout-btn">
+      <i data-lucide="log-out"></i> Cerrar Sesión
+    </button>
+</aside>
+
+<!-- OVERLAY PARA CERRAR SIDEBAR EN MÓVIL -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ================= CONTENIDO ================= -->
+<div id="message-container" class="message-container"></div>
+<main class="main-content">
+  <!-- ===== ACTIVAS ===== -->
+  <div class="page-section" id="section-actives">
+    <header class="page-header">
+      <h1>📊 Inversiones Activas</h1>
+      <p id="msg-actives">Listado de inversiones (Pendientes o Activas)</p>
+    </header>
+    <div class="investments-grid" id="grid-actives"></div>
+  </div>
+
+  <!-- ===== NUEVA INVERSION ===== -->
+  <div class="page-section" id="section-new" style="display:none;">
+    <header class="page-header">
+      <h1>➕ Crear Nueva Inversión</h1>
+    </header>
+    <div class="profile-form">
+      <div class="form-group">
+        <label>Nombre de la inversión</label>
+        <input type="text" id="new-name" placeholder="Nombre de inversión">
+      </div>
+      <div class="form-group">
+        <label>Empresa</label>
+        <select id="new-company"></select>
+      </div>
+      <div class="form-group">
+        <label>Plazo (meses)</label>
+        <input type="number" id="new-term" placeholder="Plazo estimado">
+      </div>
+      <div class="form-group">
+        <label>Rentabilidad (%)</label>
+        <input type="number" id="new-profit" placeholder="Rentabilidad esperada">
+      </div>
+      <button class="btn-invest" onclick="createInvestment()">Crear <i data-lucide="check"></i></button>
+    </div>
+  </div>
+
+  <!-- ===== EMPRESAS ===== -->
+  <div class="page-section" id="section-companies" style="display:none;">
+    <header class="page-header">
+      <h1>🏢 Empresas</h1>
+      <p>Lista de empresas</p>
+    </header>
+    <div class="investments-grid" id="grid-companies"></div><br>
+    <button class="btn-create" onclick="openCompanyModal()">Crear Empresa<i data-lucide="plus"></i></button>
+  </div>
+</main>
+
+<!-- ================= MODAL EMPRESAS ================= -->
+<div id="companyModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="companyModalTitle">Crear Empresa</h2>
+      <button class="close-btn" onclick="closeCompanyModal()">&times;</button>
+    </div>
+    <div class="form-group">
+      <label><strong>Nombre</strong></label>
+      <input type="text" id="company-name" placeholder="Nombre de la empresa">
+    </div>
+    <div class="form-group">
+      <label><strong>CIF</strong></label>
+      <input type="text" id="company-cif" placeholder="CIF">
+    </div>
+    <div class="form-group">
+      <label><strong>Cuenta Bancaria</strong></label>
+      <input type="text" id="company-account" placeholder="Cuenta bancaria">
+    </div>
+    <button class="btn-invest" onclick="saveCompany()">Guardar <i data-lucide="check"></i></button>
+  </div>
+</div>
+
+<!-- ================= MODAL INVERSIONES ================= -->
+<div id="investmentModal" class="modal">
+  <div class="modal-content inversiones">
+    <div class="modal-header">
+      <h2>Editar Inversión</h2>
+      <button class="close-btn" onclick="closeInvestmentModal()">&times;</button>
+    </div>
+    <input type="hidden" id="edit-inv-id">
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="edit-name">
+    </div>
+    <div class="form-group">
+      <label>Empresa</label>
+      <select id="edit-company"></select>
+    </div>
+    <div class="form-group">
+      <label>Plazo (meses)</label>
+      <input type="number" id="edit-term">
+    </div>
+    <div class="form-group">
+      <label>Rentabilidad (%)</label>
+      <input type="number" id="edit-profit">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="edit-estado">
+        <option value="Pendiente">Pendiente</option>
+        <option value="Abierta">Abierta</option>
+        <option value="Activa">Activa</option>
+        <option value="Cerrada">Cerrada</option>
+        <option value="Cancelada">Cancelada</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fecha de Creación</label>
+      <p id="edit-fecha"></p>
+    </div>
+    <button class="btn-invest" onclick="saveInvestment()">Guardar Cambios</button>
+  </div>
+</div>
+
+  <script>
+  /* ================= SUPABASE ================= */
+    const supabaseCli = window.supabase.createClient(
+      'https://adentfqqughsqqpaswzu.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZW50ZnFxdWdoc3FxcGFzd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNDYxMDAsImV4cCI6MjA4NDcyMjEwMH0._jm4UsVu0DLPT9LYq--yynCbVCLEgDufTIglcTPm9_E'
+    );
+
+    /* ================= STATE ================= */
+    let navActives, navNew, navCompanies;
+    let sectionActives, sectionNew, sectionCompanies;
+
+    let activeInvestments = [];
+    let companies = [];
+    let editingCompanyId = null;
+
+    /* ================= INIT ================= */
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+
+      navActives = document.getElementById('nav-actives');
+      navNew = document.getElementById('nav-new');
+      navCompanies = document.getElementById('nav-companies');
+
+      sectionActives = document.getElementById('section-actives');
+      sectionNew = document.getElementById('section-new');
+      sectionCompanies = document.getElementById('section-companies');
+
+      // 🔐 PROTECCIÓN ADMIN
+      await autoLogin();
+
+      // 📦 CARGA NORMAL
+      await loadActiveInvestments();
+      await loadCompanies();
+
+      navActives.onclick = () => {
+        switchSection('actives');
+        closeMobileMenu();
+      };
+      navNew.onclick = () => {
+        showNewInvestmentSection();
+        closeMobileMenu();
+      };
+      navCompanies.onclick = () => {
+        switchSection('companies');
+        closeMobileMenu();
+      };
+      
+      // Event listeners para mobile
+      document.getElementById('mobile-toggle').onclick = toggleSidebarMobile;
+      document.getElementById('sidebar-overlay').onclick = closeMobileMenu;
+    });
+
+    /* ================= ADMIN LOGIN / PROTECCIÓN ================= */
+    async function autoLogin(){
+      const { data: { user } } = await supabaseCli.auth.getUser();
+
+      if (!user) {
+        window.location.href = './';
+        return;
+      }
+
+      const { data: profile, error } = await supabaseCli
+        .from('profiles')
+        .select('nombre, role')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile) {
+        window.location.href = './';
+        return;
+      }
+
+      if (profile.role !== 'admin') {
+        window.location.href = './';
+        return;
+      }
+
+      document.getElementById('welcomeUser').textContent =
+        profile.nombre || user.email;
+    }
+
+    /* ================= LOGOUT ================= */
+  document.querySelector('.logout-btn').onclick = () => {
+    logout();
+    closeMobileMenu();
+  };
+
+  async function logout(){
+  await supabaseCli.auth.signOut();
+  window.location.href = './';
+}
+
+    /* ================= LOAD DATA ================= */
+    async function loadActiveInvestments(){
+      const { data } = await supabaseCli
+        .from('operaciones')
+        .select(`
+          id,
+          nombre,
+          rentabilidad_inicial,
+          plazo_previsto_meses,
+          estado,
+          created_at,
+          empresa_id,
+          empresas(nombre)
+        `);
+
+      activeInvestments = data || [];
+      renderActiveInvestments();
+    }
+
+    async function loadCompanies(){
+      const { data } = await supabaseCli
+        .from('empresas')
+        .select('id, nombre, cif, cuenta_bancaria');
+
+      companies = data || [];
+      renderCompanies();
+      loadCompanyOptions();
+    }
+
+    /* ================= RENDER ================= */
+    function renderActiveInvestments(){
+      const grid = document.getElementById('grid-actives');
+
+      grid.innerHTML = activeInvestments.length
+        ? activeInvestments.map(inv => {
+            const empresa = inv.empresas?.nombre || '—';
+            const fecha = inv.created_at
+              ? new Date(inv.created_at).toLocaleDateString('es-ES')
+              : '—';
+
+            return `
+            <div class="investment-card">
+              <div class="card-header">
+                <div class="card-company">
+                  <div class="company-icon"><i data-lucide="building-2"></i></div>
+                  <div class="company-info">
+                    <h3>${inv.nombre}</h3>
+                    <p>${empresa}</p>
+                  </div>
+                </div>
+                <span class="badge badge-active">${inv.estado}</span>
+              </div>
+
+              <div class="card-stats">
+                <div class="stat-box">
+                  <div class="stat-label">Rentabilidad</div>
+                  <div class="stat-value success">${inv.rentabilidad_inicial}%</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Plazo</div>
+                  <div class="stat-value">${inv.plazo_previsto_meses} meses</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Creada</div>
+                  <div class="stat-value">${fecha}</div>
+                </div>
+              </div>
+
+              <button class="btn-edit" onclick='openInvestmentModal(${JSON.stringify(inv)})'>
+                Editar
+              </button>
+            </div>
+            `;
+          }).join('')
+        : 'No hay inversiones';
+
+      lucide.createIcons();
+    }
+
+    function renderCompanies(){
+      const grid = document.getElementById('grid-companies');
+
+      grid.innerHTML = companies.length
+        ? companies.map(c => `
+          <div class="company-card">
+            <h3>${c.nombre}</h3>
+            <p>${c.cif}</p>
+            <p>${c.cuenta_bancaria}</p>
+            <button class="btn-edit"
+              onclick="openCompanyModal(
+                '${c.id}',
+                '${c.nombre}',
+                '${c.cif}',
+                '${c.cuenta_bancaria}'
+              )">
+              Editar
+            </button>
+          </div>
+        `).join('')
+        : 'No hay empresas creadas';
+
+      lucide.createIcons();
+    }
+
+    /* ================= MODALES ================= */
+    function openCompanyModal(id = null, nombre = '', cif = '', cuenta = ''){
+      editingCompanyId = id;
+      document.getElementById('companyModalTitle').textContent =
+        id ? 'Editar Empresa' : 'Crear Empresa';
+
+      document.getElementById('company-name').value = nombre;
+      document.getElementById('company-cif').value = cif;
+      document.getElementById('company-account').value = cuenta;
+
+      document.getElementById('companyModal').style.display = 'flex';
+    }
+
+    function closeCompanyModal(){
+      document.getElementById('companyModal').style.display = 'none';
+    }
+
+    function openInvestmentModal(inv){
+      document.getElementById('edit-inv-id').value = inv.id;
+      document.getElementById('edit-name').value = inv.nombre;
+      document.getElementById('edit-term').value = inv.plazo_previsto_meses;
+      document.getElementById('edit-profit').value = inv.rentabilidad_inicial;
+      document.getElementById('edit-estado').value = inv.estado;
+
+      document.getElementById('edit-fecha').textContent =
+        inv.created_at
+          ? new Date(inv.created_at).toLocaleString('es-ES')
+          : '—';
+
+      const select = document.getElementById('edit-company');
+      select.innerHTML = '';
+
+      companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nombre;
+        opt.selected = c.id === inv.empresa_id;
+        select.appendChild(opt);
+      });
+
+      document.getElementById('investmentModal').style.display = 'flex';
+    }
+
+    function closeInvestmentModal(){
+      document.getElementById('investmentModal').style.display = 'none';
+
+    }
+
+    /* ================= CREATE / EDIT ================= */
+    async function createInvestment(){
+      const nombre = document.getElementById('new-name').value;
+      const empresaId = document.getElementById('new-company').value;
+      const plazo = +document.getElementById('new-term').value;
+      const rentabilidad = +document.getElementById('new-profit').value;
+
+      if(!nombre || !empresaId || isNaN(plazo) || isNaN(rentabilidad)){
+        return showMessage('Completa todos los campos','error');
+      }
+
+      const { error } = await supabaseCli.from('operaciones').insert({
+        nombre,
+        empresa_id: empresaId,
+        plazo_previsto_meses: plazo,
+        rentabilidad_inicial: rentabilidad,
+        estado: 'Pendiente',
+        created_at: new Date().toISOString()
+      });
+
+      if(error) return showMessage('Error creando inversión','error');
+
+      await loadActiveInvestments();
+    
+      showMessage('Inversión creada');
+      
+      document.getElementById('new-name').value='';
+      document.getElementById('new-company').value='';
+      document.getElementById('new-term').value='';
+      document.getElementById('new-profit').value='';
+
+      setTimeout(switchSection, 1000, 'actives');
+      
+    }
+
+    async function saveInvestment(){
+      const id = document.getElementById('edit-inv-id').value;
+
+      const payload = {
+        nombre: document.getElementById('edit-name').value,
+        empresa_id: document.getElementById('edit-company').value,
+        plazo_previsto_meses: +document.getElementById('edit-term').value,
+        rentabilidad_inicial: +document.getElementById('edit-profit').value,
+        estado: document.getElementById('edit-estado').value
+      };
+
+      const { error } = await supabaseCli
+        .from('operaciones')
+        .update(payload)
+        .eq('id', id);
+
+      if(error) return showMessage('Error guardando inversión','error');
+
+      closeInvestmentModal();
+      await loadActiveInvestments();
+      showMessage('Inversión actualizada');
+    }
+
+    async function saveCompany(){
+      const payload = {
+        nombre: document.getElementById('company-name').value,
+        cif: document.getElementById('company-cif').value,
+        cuenta_bancaria: document.getElementById('company-account').value
+      };
+
+      if(!payload.nombre || !payload.cif || !payload.cuenta_bancaria){
+        return showMessage('Rellena todos los campos','error');
+      }
+
+      let error;
+      if(editingCompanyId){
+        ({ error } = await supabaseCli
+          .from('empresas')
+          .update(payload)
+          .eq('id', editingCompanyId));
+      } else {
+        ({ error } = await supabaseCli
+          .from('empresas')
+          .insert(payload));
+      }
+
+      if(error) return showMessage('Error guardando empresa','error');
+
+      closeCompanyModal();
+      await loadCompanies();
+      showMessage(editingCompanyId ? 'Empresa actualizada' : 'Empresa creada');
+    }
+
+    /* ================= UTILS ================= */
+    function loadCompanyOptions(){
+      const selectNew = document.getElementById('new-company');
+      const selectEdit = document.getElementById('edit-company');
+
+      selectNew.innerHTML = '<option value="">Selecciona empresa</option>';
+      selectEdit.innerHTML = '<option value="">Selecciona empresa</option>';
+
+      companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nombre;
+
+        selectNew.appendChild(opt.cloneNode(true));
+        selectEdit.appendChild(opt);
+      });
+    }
+
+    function switchSection(section){
+      document.querySelectorAll('.sidebar-nav .nav-item')
+        .forEach(n => n.classList.remove('active'));
+
+      sectionActives.style.display = 'none';
+      sectionNew.style.display = 'none';
+      sectionCompanies.style.display = 'none';
+
+      if(section === 'actives'){
+        navActives.classList.add('active');
+        sectionActives.style.display = 'block';
+      } else if(section === 'new'){
+        navNew.classList.add('active');
+        sectionNew.style.display = 'block';
+      } else if(section === 'companies'){
+        navCompanies.classList.add('active');
+        sectionCompanies.style.display = 'block';
+      }
+    }
+
+    function toggleSidebar(){
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+    
+    // ================= MOBILE MENU =================
+    function toggleSidebarMobile() {
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+      const mobileHeader = document.querySelector('.mobile-header');
+      
+      sidebar.classList.toggle('open');
+      sidebarOverlay.classList.toggle('active');
+      
+      // Ocultar/mostrar el header móvil
+      if (sidebar.classList.contains('open')) {
+        mobileHeader.classList.add('hidden');
+      } else {
+        mobileHeader.classList.remove('hidden');
+      }
+    }
+    
+    function closeMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+      const mobileHeader = document.querySelector('.mobile-header');
+      
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('active');
+      
+      // Mostrar el header móvil al cerrar el sidebar
+      mobileHeader.classList.remove('hidden');
+    }
+
+    function showMessage(text, type='success'){
+      const container = document.getElementById('message-container');
+      const msg = document.createElement('div');
+      msg.className = 'message' + (type === 'error' ? ' error' : '');
+      msg.textContent = text;
+      container.appendChild(msg);
+      setTimeout(() => msg.remove(), 3000);
+    }
+
+    async function showNewInvestmentSection(){
+      switchSection('new');
+      loadCompanyOptions();
+    }
+
+
+  </script>
+
+</body>
+</html>
