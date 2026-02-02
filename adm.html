@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Stella Investments User</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+    /* ========================================
+       VARIABLES CSS - PALETA DE COLORES
+    ======================================== */
+
+    :root {
+      /* Azules financieros */
+      --primary: #2563eb;
+      --primary-light: #3b82f6;
+      --primary-dark: #1e40af;
+      --secondary: #60a5fa;
+     
+      /* Fondos */
+      --bg-light: #f0f4f8;
+      --bg-card: rgba(255, 255, 255, 0.8);
+     
+      /* Texto */
+      --text-dark: #1e293b;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+     
+      /* Estados */
+      --success: #10b981;
+      --success-bg: #d1fae5;
+      --warning: #f59e0b;
+      --warning-bg: #fef3c7;
+      --error: #ef4444;
+      --error-bg: #fee2e2;
+     
+      /* Glass effect */
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.3);
+     
+      /* Sidebar */
+      --sidebar-width: 280px;
+      --sidebar-collapsed: 180px;
+    }
+    /* ========================================
+       RESET Y BASE
+    ======================================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #e0e7ff 100%);
+      min-height: 100vh;
+      color: var(--text-dark);
+      overflow-x: hidden;
+    }
+    /* ========================================
+       FONDO ANIMADO
+    ======================================== */
+    .background-blobs {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+    }
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.3;
+      animation: float 8s ease-in-out infinite;
+    }
+    .blob-1 {
+      width: 400px;
+      height: 400px;
+      background: var(--primary);
+      top: -100px;
+      right: -100px;
+    }
+    .blob-2 {
+      width: 350px;
+      height: 350px;
+      background: var(--secondary);
+      bottom: -100px;
+      left: -100px;
+      animation-delay: -4s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-20px) scale(1.05); }
+    }
+    
+    /* ========================================
+       MOBILE HEADER
+    ======================================== */
+    .mobile-header {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+      z-index: 999;
+      padding: 0 16px;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform 0.3s ease;
+    }
+    
+    /* Ocultar header cuando sidebar está abierto */
+    .mobile-header.hidden {
+      transform: translateY(-100%);
+    }
+    
+    .hamburger-btn {
+      width: 44px;
+      height: 44px;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    
+    .hamburger-btn:hover {
+      background: rgba(37, 99, 235, 0.1);
+    }
+    
+    .hamburger-btn svg {
+      width: 24px;
+      height: 24px;
+      color: var(--text-dark);
+    }
+    
+    .mobile-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .mobile-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .mobile-logo-icon svg {
+      color: white;
+      width: 20px;
+      height: 20px;
+    }
+    
+    .mobile-logo-text {
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-dark);
+    }
+    
+    /* ========================================
+       SIDEBAR OVERLAY (para cerrar en móvil)
+    ======================================== */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 98;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .sidebar-overlay.active {
+      opacity: 1;
+    }
+    
+    /* ========================================
+       SIDEBAR
+    ======================================== */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      width: var(--sidebar-width);
+      background: rgba(255, 255, 255, 1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-right: 1px solid var(--glass-border);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      z-index: 100;
+    }
+    
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 1px;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-icon svg {
+      color: white;
+      width: 24px;
+      height: 24px;
+    }
+    .logo-text {
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--text-dark);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .nav-item:hover {
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--primary);
+    }
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    }
+    .nav-item svg {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .nav-item span {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    
+    .sidebar-footer {
+      padding-top: 16px;
+      border-top: 1px solid var(--glass-border);
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(37, 99, 235, 0.05);
+    }
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .user-details {
+      overflow: hidden;
+    }
+    .user-name {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .user-role {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    
+    /* ========================================
+       CONTENIDO PRINCIPAL
+    ======================================== */
+    .message-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+    }
+    .message {
+      background-color: #38a169;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: slideIn 0.3s ease;
+    }
+    .message.error {
+      background-color: var(--error);
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .main-content {
+      margin-left: var(--sidebar-width);
+      padding: 32px;
+      min-height: 100vh;
+      transition: margin-left 0.3s ease;
+    }
+    
+    .section-header {
+      margin-bottom: 32px;
+    }
+    .section-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-dark);
+    }
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+    .investment-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .investment-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: all 0.3s;
+    }
+    .investment-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.15);
+    }
+    .card-header {
+      margin-bottom: 20px;
+    }
+    .card-company {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      position: relative;
+    }
+    .company-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .company-icon svg {
+      color: white;
+      width: 24px;
+      height: 24px;
+    }
+    .card-company h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--text-dark);
+    }
+    .card-company p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-active {
+      background: var(--success-bg);
+      color: var(--success);
+    }
+    .card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px 0;
+      border-top: 1px solid var(--glass-border);
+      border-bottom: 1px solid var(--glass-border);
+      margin-bottom: 20px;
+    }
+    .card-stats > div {
+      text-align: center;
+    }
+    .card-stats > div > div {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .card-stats strong {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .progress-section {
+      margin-bottom: 16px;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .progress-bar {
+      height: 8px;
+      background: rgba(37, 99, 235, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .invested-amount {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(37, 99, 235, 0.05);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .invested-amount span:last-child {
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .btn-invest {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-invest:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* ========================================
+       MODAL
+    ======================================== */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .modal.active {
+      display: flex;
+      opacity: 1;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s;
+    }
+    .modal.active .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .modal-header h2 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .close-modal {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    .close-modal:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .close-modal svg {
+      width: 24px;
+      height: 24px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-dark);
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      font-size: 15px;
+      transition: all 0.2s;
+      background: white;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .form-group input:disabled {
+      background: #f8f9fa;
+      color: var(--text-muted);
+    }
+    .investment-summary {
+      background: var(--bg-light);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .summary-row:last-child {
+      margin-bottom: 0;
+      padding-top: 12px;
+      border-top: 1px solid var(--glass-border);
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .btn-confirm {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-confirm:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* ========================================
+       PERFIL
+    ======================================== */
+    .profile-section {
+      max-width: 600px;
+    }
+    .profile-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 32px;
+    }
+    .profile-card h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+    .logout-btn {
+      width: 100%;
+      padding: 14px;
+      background: red;
+      color: white;
+      border: 2px solid var(--error);
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 16px;
+    }
+    .logout-btn:hover {
+      background: var(--error);
+      color: white;
+    }
+    
+    /* ========================================
+       RESPONSIVE
+    ======================================== */
+    @media (max-width: 768px) {
+      /* Mostrar header móvil */
+      .mobile-header {
+        display: flex;
+      }
+      
+      /* Sidebar fuera de pantalla por defecto */
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      
+      /* Sidebar abierto */
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      
+      /* Mostrar overlay cuando sidebar está abierto */
+      .sidebar.open ~ .sidebar-overlay {
+        display: block;
+      }
+      
+      /* Contenido principal sin margen */
+      .main-content {
+        margin-left: 0;
+        padding: 80px 16px 24px;
+      }
+      
+      /* Grid de inversiones en una columna */
+      .investment-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      /* Modal más compacto */
+      .modal-content {
+        padding: 24px;
+      }
+      
+      /* Perfil */
+      .profile-card {
+        padding: 24px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .section-header h1 {
+        font-size: 24px;
+      }
+      
+      .mobile-logo-text {
+        display: ;
+      }
+    }
+</style>
+</head>
+<body>
+<!-- MENSAJE CONTAINER -->
+<div id="message-container" class="message-container"></div>
+
+<!-- MOBILE HEADER -->
+<div class="mobile-header">
+  <button class="hamburger-btn" id="mobile-toggle">
+    <i data-lucide="menu"></i>
+  </button>
+  <div class="mobile-logo">
+    <div class="mobile-logo-icon">
+      <i data-lucide="trending-up"></i>
+    </div>
+    <span class="mobile-logo-text">Stella Invest</span>
+  </div>
+  <div style="width: 44px;"></div> <!-- Spacer para centrar logo -->
+</div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar" class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <i data-lucide="trending-up"></i>
+    </div>
+    <span class="logo-text">Stella Investments</span>
+  </div>
+  
+  <nav class="sidebar-nav">
+    <div class="nav-item active" id="nav-opportunities">
+      <i data-lucide="briefcase"></i>
+      <span>Oportunidades</span>
+    </div>
+    <div class="nav-item" id="nav-my">
+      <i data-lucide="wallet"></i>
+      <span>Mis Inversiones</span>
+    </div>
+    <div class="nav-item" id="nav-profile">
+      <i data-lucide="user"></i>
+      <span>Mi Perfil</span>
+    </div>
+  </nav>
+  
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar" id="welcomeUser">U</div>
+      <div class="user-details">
+        <div class="user-name">Usuario</div>
+        <div class="user-role">Inversor</div>
+      </div>
+    </div>
+    <button class="logout-btn">
+      <i data-lucide="log-out"></i> Cerrar Sesión
+    </button>
+  </div>
+</aside>
+
+<!-- OVERLAY PARA CERRAR SIDEBAR EN MÓVIL -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- CONTENIDO PRINCIPAL -->
+<main class="main-content">
+  <!-- SECCIÓN: OPORTUNIDADES -->
+  <section id="section-opportunities">
+    <div class="section-header">
+      <h1>Oportunidades de Inversión</h1>
+      <p id="msg-opportunities">Inversiones disponibles para ti</p>
+    </div>
+    <div class="investment-grid" id="grid-opportunities"></div>
+  </section>
+
+  <!-- SECCIÓN: MIS INVERSIONES -->
+  <section id="section-my" style="display: none;">
+    <div class="section-header">
+      <h1>Mis Inversiones</h1>
+      <p id="msg-my">Tus inversiones activas</p>
+    </div>
+    <div class="investment-grid" id="grid-my"></div>
+  </section>
+
+  <!-- SECCIÓN: PERFIL -->
+  <section id="section-profile" class="profile-section" style="display: none;">
+    <div class="section-header">
+      <h1>Mi Perfil</h1>
+      <p>Gestiona tu información personal</p>
+    </div>
+    <div class="profile-card">
+      <h2>Datos Personales</h2>
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" id="profile-nombre" placeholder="Tu nombre">
+      </div>
+      <div class="form-group">
+        <label>Apellidos</label>
+        <input type="text" id="profile-apellidos" placeholder="Tus apellidos">
+      </div>
+      <div class="form-group">
+        <label>DNI/NIE</label>
+        <input type="text" id="profile-dni" placeholder="Tu DNI o NIE">
+      </div>
+      <button class="btn-confirm" onclick="saveProfile()">
+        Guardar Cambios
+      </button>
+    </div>
+  </section>
+</main>
+
+<!-- MODAL INVERSIÓN -->
+<div id="investModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Nueva Inversión</h2>
+      <button class="close-modal" onclick="closeModal()">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    
+    <div class="form-group">
+      <label>Operación</label>
+      <input type="text" id="modalCompany" disabled>
+    </div>
+    
+    <div class="form-group">
+      <label>Monto a Invertir (€)</label>
+      <input type="number" id="investAmount" placeholder="Mínimo €100" min="100" step="100" oninput="updateSummary()">
+    </div>
+    
+    <div class="investment-summary">
+      <div class="summary-row">
+        <span>Rentabilidad</span>
+        <strong id="modalRent">—</strong>
+      </div>
+      <div class="summary-row">
+        <span>Plazo</span>
+        <strong id="modalPlazo">—</strong>
+      </div>
+      <div class="summary-row">
+        <span>Retorno Estimado</span>
+        <strong id="modalReturn">€0.00</strong>
+      </div>
+    </div>
+    
+    <button class="btn-confirm" onclick="confirmInvestment()">
+      Confirmar Inversión
+    </button>
+  </div>
+</div>
+
+<!-- FONDO ANIMADO -->
+<div class="background-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<script>
+// ================= SUPABASE CONFIG =================
+const SUPABASE_URL = 'https://adentfqqughsqqpaswzu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZW50ZnFxdWdoc3FxcGFzd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNDYxMDAsImV4cCI6MjA4NDcyMjEwMH0._jm4UsVu0DLPT9LYq--yynCbVCLEgDufTIglcTPm9_E';
+const supabaseCli = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ================= DOM ELEMENTS =================
+const investModal = document.getElementById('investModal');
+const modalCompany = document.getElementById('modalCompany');
+const modalRent = document.getElementById('modalRent');
+const modalPlazo = document.getElementById('modalPlazo');
+const modalReturn = document.getElementById('modalReturn');
+const investAmount = document.getElementById('investAmount');
+const sectionOpportunities = document.getElementById('section-opportunities');
+const sectionMy = document.getElementById('section-my');
+const sectionProfile = document.getElementById('section-profile');
+const navOpportunities = document.getElementById('nav-opportunities');
+const navMy = document.getElementById('nav-my');
+const navProfile = document.getElementById('nav-profile');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+// ================= STATE =================
+let allInvestments = [];
+let myInvestments = [];
+let selectedInvestmentId = null;
+
+// ================= INIT =================
+document.addEventListener('DOMContentLoaded', async () => {
+  lucide.createIcons();
+  await autoLogin();
+  await loadAll();
+  await loadProfile();
+  
+  // Event listeners
+  navOpportunities.onclick = () => {
+    switchSection('opportunities');
+    closeMobileMenu();
+  };
+  navMy.onclick = () => {
+    switchSection('my');
+    closeMobileMenu();
+  };
+  navProfile.onclick = () => {
+    switchSection('profile');
+    closeMobileMenu();
+  };
+  
+  // Mobile menu
+  document.getElementById('mobile-toggle').onclick = toggleSidebarMobile;
+  sidebarOverlay.onclick = closeMobileMenu;
+  
+  // Logout
+  document.querySelector('.logout-btn').onclick = () => {
+    logout();
+    closeMobileMenu();
+  };
+});
+
+// ================= MOBILE MENU =================
+// ================= MOBILE MENU =================
+function toggleSidebarMobile() {
+  const mobileHeader = document.querySelector('.mobile-header');
+  sidebar.classList.toggle('open');
+  sidebarOverlay.classList.toggle('active');
+  
+  // Ocultar/mostrar el header móvil
+  if (sidebar.classList.contains('open')) {
+    mobileHeader.classList.add('hidden');
+  } else {
+    mobileHeader.classList.remove('hidden');
+  }
+}
+
+function closeMobileMenu() {
+  const mobileHeader = document.querySelector('.mobile-header');
+  sidebar.classList.remove('open');
+  sidebarOverlay.classList.remove('active');
+  
+  // Mostrar el header móvil al cerrar el sidebar
+  mobileHeader.classList.remove('hidden');
+}
+
+// ================= LOGIN =================
+async function autoLogin(){
+  try {
+    const { data: { user } } = await supabaseCli.auth.getUser();
+    if (!user) {
+      console.log('No hay usuario autenticado');
+      return;
+    }
+    const { data: profile, error } = await supabaseCli
+      .from('profiles')
+      .select('nombre, role')
+      .eq('id', user.id)
+      .single();
+    if (error || !profile) {
+      console.log('Error cargando perfil:', error);
+      return;
+    }
+    if (profile.role !== 'user') {
+      console.log('Usuario no tiene rol de user');
+      return;
+    }
+    document.getElementById('welcomeUser').textContent = 
+      (profile.nombre || user.email).charAt(0).toUpperCase();
+    document.querySelector('.user-name').textContent = profile.nombre || user.email;
+  } catch(e) {
+    console.error('Error en autoLogin:', e);
+  }
+}
+
+// ================= LOGOUT =================
+async function logout(){
+  await supabaseCli.auth.signOut();
+  window.location.href = './';
+}
+
+// ================= LOAD DATA =================
+async function loadAll(){
+  await loadOpportunities();
+  await loadMyInvestments();
+  renderSections();
+}
+
+async function loadOpportunities(){
+  const { data } = await supabaseCli
+    .from('operaciones')
+    .select(`id, nombre, rentabilidad_inicial, plazo_previsto_meses, estado, empresas(nombre)`)
+    .eq('estado','Abierta');
+  allInvestments = data || [];
+}
+
+async function loadMyInvestments(){
+  const { data: { user } } = await supabaseCli.auth.getUser();
+  const { data } = await supabaseCli
+    .from('inscripciones')
+    .select(`
+      importe,
+      created_at,
+      operaciones (
+        id, nombre, rentabilidad_inicial, plazo_previsto_meses, estado,
+        empresas(nombre)
+      )
+    `)
+    .eq('user_id', user.id);
+  myInvestments = (data || []).map(i => ({
+    ...i.operaciones,
+    importe: i.importe,
+    created_at: i.created_at
+  }));
+}
+
+// ================= PROGRESO =================
+function calculateProgress(createdAt, plazoMeses){
+  if(!createdAt || !plazoMeses) return { meses: 0, porcentaje: 0 };
+  const start = new Date(createdAt);
+  const now = new Date();
+  let meses = (now.getFullYear() - start.getFullYear()) * 12 +
+              (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) meses--;
+  meses = Math.max(0, meses);
+  return {
+    meses,
+    porcentaje: Math.min(100, (meses / plazoMeses) * 100)
+  };
+}
+
+// ================= RENDER =================
+function renderSections(){
+  const opportunities = allInvestments.filter(
+    i => !myInvestments.find(m => m.id === i.id)
+  );
+  const gridOp = document.getElementById('grid-opportunities');
+  const gridMy = document.getElementById('grid-my');
+  gridOp.innerHTML = opportunities.map(renderCard).join('');
+  gridMy.innerHTML = myInvestments.map(renderCard).join('');
+  document.getElementById('msg-opportunities').textContent =
+    opportunities.length ? 'Inversiones disponibles para ti' : 'No hay inversiones disponibles';
+  document.getElementById('msg-my').textContent =
+    myInvestments.length ? 'Tus inversiones activas' : 'No participas en ninguna inversión';
+  lucide.createIcons();
+}
+
+function renderCard(inv){
+  const empresa = inv.empresas?.nombre || '—';
+  let footer = '';
+  if (inv.importe){
+    const p = calculateProgress(inv.created_at, inv.plazo_previsto_meses);
+    footer = `
+      <div class="progress-section">
+        <div class="progress-header">
+          <span>Progreso</span>
+          <span>${p.meses}/${inv.plazo_previsto_meses} meses</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${p.porcentaje}%"></div>
+        </div>
+      </div>
+      <div class="invested-amount">
+        <span>Invertido</span>
+        <span>€${inv.importe.toLocaleString()}</span>
+      </div>`;
+  } else {
+    footer = `
+      <button class="btn-invest" onclick="openModal('${inv.id}')">
+        Invertir <i data-lucide="arrow-right"></i>
+      </button>`;
+  }
+  return `
+  <div class="investment-card">
+    <div class="card-header">
+      <div class="card-company">
+        <div class="company-icon"><i data-lucide="building-2"></i></div>
+        <div>
+          <h3>${inv.nombre}</h3>
+          <p>${empresa}</p>
+        </div>
+        <span class="badge badge-active">${inv.estado}</span>
+      </div>
+    </div>
+    <div class="card-stats">
+      <div>
+        <div>Rentabilidad</div>
+        <strong>${inv.rentabilidad_inicial}%</strong>
+      </div>
+      <div>
+        <div>Plazo</div>
+        <strong>${inv.plazo_previsto_meses} meses</strong>
+      </div>
+    </div>
+    ${footer}
+  </div>`;
+}
+
+// ================= MODAL =================
+function openModal(id){
+  const inv = allInvestments.find(i => i.id === id);
+  if(!inv) return;
+  selectedInvestmentId = id;
+  modalCompany.value = inv.nombre;
+  modalRent.textContent = inv.rentabilidad_inicial + '%';
+  modalPlazo.textContent = inv.plazo_previsto_meses + ' meses';
+  investModal.classList.add('active');
+}
+
+function closeModal(){
+  investModal.classList.remove('active');
+  selectedInvestmentId = null;
+}
+
+function updateSummary(){
+  const amount = +investAmount.value || 0;
+  const rent = +modalRent.textContent.replace('%','');
+  modalReturn.textContent = '€' + (amount * (1 + rent / 100)).toFixed(2);
+}
+
+async function confirmInvestment(){
+  const { data: { user } } = await supabaseCli.auth.getUser();
+  const amount = +investAmount.value;
+  if(amount < 100){
+    showMessage('El mínimo de inversión es €100','error');
+    return;
+  }
+  await supabaseCli.from('inscripciones').insert({
+    user_id: user.id,
+    operacion_id: selectedInvestmentId,
+    importe: amount
+  });
+  closeModal();
+  await loadAll();
+  showMessage('Te has inscrito en la inversión');
+}
+
+// ================= SECCIONES =================
+function switchSection(section){
+  sectionOpportunities.style.display = 'none';
+  sectionMy.style.display = 'none';
+  sectionProfile.style.display = 'none';
+  [navOpportunities, navMy, navProfile].forEach(nav => nav.classList.remove('active'));
+  
+  if(section === 'opportunities') {
+    sectionOpportunities.style.display = 'block';
+    navOpportunities.classList.add('active');
+  }
+  if(section === 'my') {
+    sectionMy.style.display = 'block';
+    navMy.classList.add('active');
+  }
+  if(section === 'profile') {
+    sectionProfile.style.display = 'block';
+    navProfile.classList.add('active');
+  }
+}
+
+// ================= PERFIL =================
+async function loadProfile(){
+  try {
+    const { data: userData } = await supabaseCli.auth.getUser();
+    const user = userData.user;
+    if(!user) return;
+    const { data: profile, error } = await supabaseCli
+      .from('profiles')
+      .select('nombre, apellidos, dni')
+      .eq('id', user.id)
+      .single();
+    if(error) return showMessage('Error cargando perfil','error');
+    document.getElementById('profile-nombre').value = profile.nombre || '';
+    document.getElementById('profile-apellidos').value = profile.apellidos || '';
+    document.getElementById('profile-dni').value = profile.dni || '';
+    
+    // Actualizar user-info en el sidebar
+    const userName = profile.nombre || user.email;
+    document.getElementById('welcomeUser').textContent = userName.charAt(0).toUpperCase();
+    document.querySelector('.user-name').textContent = userName;
+
+  } catch(e){
+    console.error(e);
+    showMessage('Error cargando perfil','error');
+  }
+
+}
+
+async function saveProfile() {
+  const { data: { user } } = await supabaseCli.auth.getUser();
+  const { error } = await supabaseCli
+    .from('profiles')
+    .update({
+      nombre: document.getElementById('profile-nombre').value,
+      apellidos: document.getElementById('profile-apellidos').value,
+      dni: document.getElementById('profile-dni').value
+    })
+    .eq('id', user.id);
+  if (error) {
+    return showMessage('Error al actualizar perfil: ' + error.message, 'error');
+  }
+
+  showMessage('Datos modificados correctamente');
+
+  await loadProfile();
+  await loadAll();
+  setTimeout(() => switchSection('opportunities'), 1000);
+
+}
+
+// ================= MENSAJES =================
+function showMessage(text, type='success'){
+  const c = document.getElementById('message-container');
+  const m = document.createElement('div');
+  m.className = 'message' + (type === 'error' ? ' error' : '');
+  m.textContent = text;
+  c.appendChild(m);
+  setTimeout(() => m.remove(), 3000);
+}
+</script>
+</body>
+</html>
