@@ -846,8 +846,8 @@
     </div>
   
     <div class="form-group">
-      <label>Cantidad a Invertir (€)</label>
-      <input type="number" id="investAmount" placeholder="Mínimo €100" min="100" step="100" oninput="updateSummary()">
+      <label>Cantidad a Invertir(€)</label>
+      <input type="number" id="investAmount" placeholder="Mínimo 1.000€" min="100" step="100" oninput="updateSummary()">
     </div>
   
     <div class="investment-summary">
@@ -1242,7 +1242,7 @@ function renderCard(inv){
       </div>
       <div>
         <div>Cant. Máxima</div>
-        <strong>${inv.maximo}€</strong>
+        <strong>${formatNumber(inv.maximo)}€</strong>
       </div>
     </div>
     ${footer}
@@ -1253,14 +1253,25 @@ function renderCard(inv){
 function openModal(id){
   const inv = allInvestments.find(i => i.id === id);
   if(!inv) return;
+  
   selectedInvestmentId = id;
   modalCompany.value = inv.nombre;
-  modalMax.textContent = inv.maximo + '€';
+  modalMax.textContent = formatNumber(inv.maximo) + '€';
   modalRent.textContent = inv.rentabilidad_inicial + '%';
   modalPlazo.textContent = inv.plazo_previsto_meses + ' meses';
   investAmount.value = '';
-  currentMax = inv.maximo;
+  
+  // Guardar el máximo en variable global
+  currentMax = inv.maximo || 0;
   investAmount.max = currentMax;
+
+if (currentMax > 0) {
+    investAmount.max = currentMax;
+    investAmount.placeholder = `Mínimo 1.000€ - Máximo ${formatNumber(currentMax)}€`;
+  } else {
+    investAmount.removeAttribute('max'); // No hay límite
+    investAmount.placeholder = 'Mínimo 1000€ - Sin límite máximo';
+  }
 
   updateSummary();
   investModal.classList.add('active');
@@ -1284,19 +1295,26 @@ async function confirmInvestment(){
   }
   
   const amount = +investAmount.value;
+  
   if(amount < 100){
-    showMessage('El mínimo de inversión es €100','error');
+    showMessage('El mínimo de inversión es €1.000€','error');
     return;
-  }
-  displayMax = 0;
-  if(amount > investAmount.max){
-    if (!investAmount.max === 0) {
-      displayMax = 'No hay cantidad máxima';
-    showMessage('No puedes invertir mas de ${maximo.toLocaleString()}€ esta vez.','error');
-    return;
-    }
   }
   
+  // Usar currentMax global
+  if (currentMax > 0 && amount > currentMax) {
+    showMessage(`No puedes invertir más de ${formatNumber(currentMax)}€ esta vez.`, 'error');
+    return;
+  }
+  
+  // Obtener el máximo
+  const maxAmount = Number(inv.maximo) || 0;
+  
+  // Validar máximo si existe
+  if (maxAmount > 0 && amount > maxAmount) {
+    showMessage(`No puedes invertir más de ${ormatNumber(maxAmount)}€ esta vez.`, 'error');
+    return;
+  }
 
   const inv = allInvestments.find(i => i.id === selectedInvestmentId);
   if (!inv) {
@@ -1349,7 +1367,7 @@ async function confirmInvestment(){
         </div>
         <div class="summary-row">
           <span>Importe: </span>
-          <strong> ${amount.toLocaleString()}€</strong>
+          <strong> ${ormatNumber(amount)}€</strong>
         </div>
         <div class="summary-row">
           <span>Concepto: </span>
@@ -1728,7 +1746,15 @@ function showMessage(text, type='success'){
   setTimeout(() => m.remove(), 3000);
 }
 
-
+function formatNumber(num) {
+  if (num === undefined || num === null || num === '') return '0';
+  
+  const number = Number(num);
+  if (isNaN(number)) return '0';
+  
+  // Convertir a string y agregar puntos como separadores de miles
+  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 </script>
 </body>
 </html>
