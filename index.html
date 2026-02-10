@@ -23,14 +23,14 @@
             <p class="logo-subtitle">Tu Plataforma de Inversiones</p>
         </div>
 
-        <!-- Card de Login -->
+        <!-- Card de Login/Registro -->
         <div class="glass-card">
             <div class="card-header">
-                <h2 class="card-title">Bienvenido</h2>
-                <p class="card-subtitle">Ingresa tus credenciales para continuar</p>
+                <h2 class="card-title" id="formTitle">Bienvenido</h2>
+                <p class="card-subtitle" id="formSubtitle">Ingresa tus credenciales para continuar</p>
             </div>
 
-            <form id="loginForm">
+            <form id="authForm">
                 <!-- Email -->
                 <div class="form-group">
                     <label class="form-label" for="email">Correo electrónico</label>
@@ -65,11 +65,16 @@
                 </div>
 
                 <!-- Botón Submit -->
-                <button onclic="login()" class="btn-gradient" id="submitBtn">
-                    <span>Iniciar Sesión</span>
+                <button type="submit" class="btn-gradient" id="submitBtn">
+                    <span id="submitText">Iniciar Sesión</span>
                     <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i>
                 </button>
             </form>
+
+            <!-- Toggle entre login y registro -->
+            <p class="toggle-link" id="toggleAuth">
+                ¿No tienes cuenta? <a href="#" onclick="toggleForm()">Regístrate</a>
+            </p>
 
             <!-- Modal completar perfil -->
             <div id="profileModal" class="modal-overlay" style="display:none;">
@@ -94,8 +99,6 @@
                 </div>
               </div>
             </div>
-
-
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -123,39 +126,140 @@
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZW50ZnFxdWdoc3FxcGFzd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNDYxMDAsImV4cCI6MjA4NDcyMjEwMH0._jm4UsVu0DLPT9LYq--yynCbVCLEgDufTIglcTPm9_E'
         );
 
-        // Capturar submit del formulario
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        // Variables modal
+        const profileModal = document.getElementById('profileModal');
+        const modalNombre = document.getElementById('modalNombre');
+        const modalApellidos = document.getElementById('modalApellidos');
+        const modalDNI = document.getElementById('modalDNI');
+
+        // Estado del formulario: 'login' o 'signup'
+        let formMode = 'login';
+
+        // Toggle entre login y signup
+        function toggleForm() {
+            const formTitle = document.getElementById('formTitle');
+            const formSubtitle = document.getElementById('formSubtitle');
+            const submitText = document.getElementById('submitText');
+            const toggleAuth = document.getElementById('toggleAuth');
+
+            if (formMode === 'login') {
+                formMode = 'signup';
+                formTitle.textContent = 'Crea tu cuenta';
+                formSubtitle.textContent = 'Regístrate para comenzar';
+                submitText.textContent = 'Registrarse';
+                toggleAuth.innerHTML = '¿Ya tienes cuenta? <a href="#" onclick="toggleForm()">Inicia sesión</a>';
+            } else {
+                formMode = 'login';
+                formTitle.textContent = 'Bienvenido';
+                formSubtitle.textContent = 'Ingresa tus credenciales para continuar';
+                submitText.textContent = 'Iniciar Sesión';
+                toggleAuth.innerHTML = '¿No tienes cuenta? <a href="#" onclick="toggleForm()">Regístrate</a>';
+            }
+        }
+
+        // Manejador del formulario
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            // Login con Supabase
-            const { data, error } = await supabaseCli.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert('Error: ' + error.message);
-                return;
-            }
+            if (formMode === 'signup') {
+                // Registro con Supabase - Envía email de confirmación
+                const { data, error } = await supabaseCli.auth.signUp({ email, password });
+                
+                if (error) {
+                    alert('Error en registro: ' + error.message);
+                    return;
+                }
 
-            // Traer perfil y rol
-            const { data: perfil, error: perfilError } = await supabaseCli
-              .from('profiles')
-              .select('nombre, role')
-              .eq('id', data.user.id)
-              .single();
+                // No creamos el perfil aquí - se creará después de confirmar el email en el login
+                alert('Registro exitoso. Por favor, confirma tu email para completar el registro.');
+                toggleForm(); // Volver a login después de registro
 
-            if (perfilError) {
-                alert('Error al obtener perfil: ' + perfilError.message);
-                return;
-            }
-
-            // Redirigir según rol
-            if (perfil.role === 'admin') {
-                window.location.href = 'adminfinal.html';
             } else {
-                window.location.href = 'usuariofinal.html';
+                // Login con Supabase
+                const { data, error } = await supabaseCli.auth.signInWithPassword({ email, password });
+                if (error) {
+                    alert('Error: ' + error.message);
+                    return;
+                }
+
+                const userId = data.user.id;
+
+                // Intentar obtener el profile
+                let { data: perfil, error: perfilError } = await supabaseCli
+                    .from('profiles')
+                    .select('id, nombre, apellidos, dni, role')
+                    .eq('id', userId)
+                    .single();
+
+                // Si no existe, creamos profile vacío
+                if (perfilError && perfilError.code === 'PGRST116') {
+                    const { error: insertError } = await supabaseCli
+                        .from('profiles')
+                        .insert({
+                            id: userId,
+                            role: 'user',
+                            nombre: '',
+                            apellidos: '',
+                            dni: ''
+                        });
+                    if (insertError) {
+                        alert('Error creando perfil: ' + insertError.message);
+                        return;
+                    }
+                    perfil = { id: userId, nombre: '', apellidos: '', dni: '', role: 'user' };
+                } else if (perfilError) {
+                    alert('Error obteniendo perfil: ' + perfilError.message);
+                    return;
+                }
+
+                // Si es primera vez (nombre vacío), mostramos modal
+                if (!perfil.nombre) {
+                    profileModal.style.display = 'flex';
+                    modalNombre.value = '';
+                    modalApellidos.value = '';
+                    modalDNI.value = '';
+                    return;
+                }
+
+                // Redirigir según rol
+                if (perfil.role === 'admin') {
+                    window.location.href = 'adminfinal.html';
+                } else {
+                    window.location.href = 'usuariofinal.html';
+                }
             }
         });
+
+        // Guardar desde modal
+        async function saveProfileModal() {
+            const nombre = modalNombre.value.trim();
+            const apellidos = modalApellidos.value.trim();
+            const dni = modalDNI.value.trim();
+
+            if (!nombre || !apellidos || !dni) {
+                alert('Completa todos los campos');
+                return;
+            }
+
+            const { data: { user } } = await supabaseCli.auth.getUser();
+
+            const { error } = await supabaseCli
+                .from('profiles')
+                .update({ nombre, apellidos, dni })
+                .eq('id', user.id);
+
+            if (error) {
+                alert('Error guardando perfil: ' + error.message);
+                return;
+            }
+
+            // Cerrar modal y redirigir
+            profileModal.style.display = 'none';
+            window.location.href = 'index.html';
+        }
     </script>
 
 </body>
