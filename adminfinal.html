@@ -1324,7 +1324,7 @@ body {
         
         const datos = [
           ['Fecha del Contrato:', fechaContrato],
-          ['Número de Contrato:', `CT-${inscripcion.id}-${Date.now().toString().slice(-6)}`],
+          ['Número de Contrato:', `CT_${inscripcion.id}__${Date.now().toString().slice(-6)}`],
           ['', ''],
           ['INVERSOR:', ''],
           ['Nombre:', `${inscripcion.usuario?.nombre || ''} ${inscripcion.usuario?.apellidos || ''}`],
@@ -1337,7 +1337,7 @@ body {
           ['', ''],
           ['TÉRMINOS DE LA INVERSIÓN:', ''],
           ['Importe Invertido:', `${inscripcion.importe} €`],
-          ['Rentabilidad Inicial:', `${inscripcion.rentabilidad_inicial} %`],
+          ['Rentabilidad Prevists:', `${inscripcion.rentabilidad_inicial} %`],
           ['Plazo Previsto:', `${inscripcion.plazo_previsto_meses} meses`],
           ['Fecha de Inversión:', new Date(inscripcion.created_at).toLocaleDateString('es-ES')],
           ['', ''],
